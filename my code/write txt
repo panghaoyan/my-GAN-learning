@@ -1,0 +1,9 @@
+import os
+
+
+path = r'C:\Users\panghaoyan\Desktop\Image_Harmonization_Datasets\composite_images'
+files = open(r'C:\Users\panghaoyan\Desktop\Image_Harmonization_Datasets\comp.txt', 'w')
+dir = os.listdir(path)
+for file in dir:
+    files.write(file + '\n')
+files.close()
