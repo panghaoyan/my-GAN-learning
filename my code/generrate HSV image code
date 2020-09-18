@@ -1,0 +1,44 @@
+import cv2
+import time
+comp_txt_dir = r'C:\Users\panghaoyan\Desktop\Image_Harmonization_Datasets\train.txt'
+real_txt_dir = r'C:\Users\panghaoyan\Desktop\Image_Harmonization_Datasets\all_test_orignal.txt'
+image_comp_dir = r'C:\Users\panghaoyan\Desktop\Image_Harmonization_Datasets\composite_images'
+image_real_dir = r'C:\Users\panghaoyan\Desktop\Image_Harmonization_Datasets\real_images'
+image_mask_dir = r'C:\Users\panghaoyan\Desktop\Image_Harmonization_Datasets\masks'
+image_names_comp_open = open(comp_txt_dir)
+image_names_real_open = open(real_txt_dir)
+image_comp_names = image_names_comp_open.readlines()
+image_real_names = image_names_real_open.readlines()
+a = 0
+for i in image_comp_names:
+    url_comp = r'C:\Users\panghaoyan\Desktop\Image_Harmonization_Datasets\composite_images' + '\\' + i
+    line1 = i.strip('\n')
+    line2 = line1.split('_')
+    url_real_name = line2[0] + '.jpg'
+    image_real = cv2.imread(r'C:\Users\panghaoyan\Desktop\Image_Harmonization_Datasets\real_images' + '\\' + url_real_name)
+    image_comp = cv2.imread(r'C:\Users\panghaoyan\Desktop\Image_Harmonization_Datasets\composite_images' + '\\' + line1)
+    HSV_image_real = cv2.cvtColor(image_real, cv2.COLOR_RGB2HSV_FULL)
+    HSV_image_comp = cv2.cvtColor(image_comp, cv2.COLOR_RGB2HSV_FULL)
+    channel_real = []
+    channles_real = cv2.split(HSV_image_real, channel_real)
+    H_real = channles_real[0]
+    S_real = channles_real[1]
+    V_real = channles_real[2]
+    channel_comp = []
+    channels_comp = cv2.split(HSV_image_comp, channel_comp)
+    H_comp = channels_comp[0]
+    S_comp = channels_comp[1]
+    V_comp = channels_comp[2]
+    HSV_merge_H = cv2.merge([H_comp, S_real, V_real])
+    HSV_merge_S = cv2.merge([H_real, S_comp, V_real])
+    HSV_merge_V = cv2.merge([H_real, S_real, V_comp])
+    HSV_RGB_H = cv2.cvtColor(HSV_merge_H, cv2.COLOR_HSV2RGB_FULL)
+    HSV_RGB_S = cv2.cvtColor(HSV_merge_S, cv2.COLOR_HSV2RGB_FULL)
+    HSV_RGB_V = cv2.cvtColor(HSV_merge_V, cv2.COLOR_HSV2RGB_FULL)
+    cv2.imwrite(r'C:\Users\panghaoyan\Desktop\train_dataset\H_comp_S_real_V_real' + '\\' + line1, HSV_RGB_H)
+    cv2.imwrite(r'C:\Users\panghaoyan\Desktop\train_dataset\H_real_S_comp_V_real' + '\\' + line1, HSV_RGB_S)
+    cv2.imwrite(r'C:\Users\panghaoyan\Desktop\train_dataset\H_real_S_real_V_comp' + '\\' + line1, HSV_RGB_V)
+    a = a+1
+    print(a)
+    time.sleep(1)
+print(a)
