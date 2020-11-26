@@ -9,26 +9,26 @@ import numpy as np
 import matplotlib.pyplot as plt
 import argparse
 
-from AlexNet import AlexNet
 from models import *
 from misc import progress_bar
-
+from tensorboardX import *
 
 CLASSES = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')# 数据集中的类别标签
 train_Loss_list = []# 初始化
 test_Loss_list = []
 train_acc_list = []
 test_acc_list = []
+#writer = SummaryWriter(log_dir='Scalar', comment='MyNet')
 
 def main():
     # 定义命令行和参数解析器三步走：1）创建对象 2）添加参数 3）解析参数
     # 创建ArgumentParser()对象-
     parser = argparse.ArgumentParser(description="cifar-10 with PyTorch")
     #添加参数
-    parser.add_argument('--lr', default=0.001, type=float, help='learning rate')#学习率
-    parser.add_argument('--epoch', default=200, type=int, help='number of epochs tp train for')#训练多少次
-    parser.add_argument('--trainBatchSize', default=512, type=int, help='training batch size')#每次训练取多少张
-    parser.add_argument('--testBatchSize', default=512, type=int, help='testing batch size')
+    parser.add_argument('--lr', default=0.03, type=float, help='learning rate')#学习率
+    parser.add_argument('--epoch', default=40, type=int, help='number of epochs tp train for')#训练多少次
+    parser.add_argument('--trainBatchSize', default=64, type=int, help='training batch size')#每次训练取多少张
+    parser.add_argument('--testBatchSize', default=256, type=int, help='testing batch size')
     parser.add_argument('--cuda', default=torch.cuda.is_available(), type=bool, help='whether cuda is in use')#cuda加速
     #实例化，把parser中设置的所有"add_argument"给返回到args子类实例当中， 那么parser中增加的属性内容都会在args实例中
     args = parser.parse_args()
@@ -54,8 +54,16 @@ class Solver(object):
         self.test_loader = None
 #===============================================================================================================导入数据
     def load_data(self):
-        train_transform = transforms.Compose([transforms.RandomHorizontalFlip(), transforms.ToTensor()])#train数据转tensor
-        test_transform = transforms.Compose([transforms.ToTensor()])#test数据转tensor
+        train_transform = transforms.Compose([
+    transforms.RandomCrop(32, padding=4),
+    transforms.RandomHorizontalFlip(),
+    transforms.ToTensor(),
+    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+])#train数据转tensor
+        test_transform = transforms.Compose([
+    transforms.ToTensor(),
+    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+])#test数据转tensor
         train_set = torchvision.datasets.CIFAR10(root='./CIFAR10', train=True, download=True, transform=train_transform)#true表示载入train数据
         self.train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=self.train_batch_size, shuffle=True)
         test_set = torchvision.datasets.CIFAR10(root='./CIFAR10', train=False, download=True, transform=test_transform)#false表示载入test数据
@@ -70,12 +78,19 @@ class Solver(object):
             self.device = torch.device('cpu')
 
         #self.model = LeNet().to(self.device)
-        self.model = AlexNet().to(self.device)
+        #self.model = AlexNet().to(self.device)
+        self.model = PangNet().to(self.device)
+        #writter.add_graph(model=AlexNet(), input_to_model=dummy_input)
         #self.model = resnet101().to(self.device)
         #self.model = resnet50().to(self.device)
-        self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr)#优化器
-        self.scheduler = optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[75, 150], gamma=0.1)#动态调整学习率
+
+        #self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr)
+        self.optimizer = optim.SGD(self.model.parameters(), lr=self.lr, momentum=0.9, weight_decay=5e-4)#优化器
+        #self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='max', factor=0.2)
+        self.scheduler = optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[10, 15, 25, 30], gamma=0.3)
+        #self.scheduler = optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=10, eta_min=0.0001)
         self.criterion = nn.CrossEntropyLoss().to(self.device) #多任务分类训练常用的损失函数，交叉熵损失函数
+        #self.criterion = nn.MultiMarginLoss(reduction='mean').to(self.device, )#多分类的hinge损失函数
 
     def train(self):
         print("train:")
@@ -83,6 +98,7 @@ class Solver(object):
         train_loss = 0
         train_correct = 0
         total = 0
+
 
         for batch_num, (data, target) in enumerate(self.train_loader):
             data, target = data.to(self.device), target.to(self.device)
@@ -92,6 +108,7 @@ class Solver(object):
             loss.backward()
             self.optimizer.step()
             train_loss += loss.item()
+            #writer.add_scalar('Scalar/loss', loss.item(), iter)
             prediction = torch.max(output, 1)  # second param "1" represents the dimension to be reduced
             '''
             print(data,data.shape)
@@ -140,17 +157,17 @@ class Solver(object):
 
     #update plot
     def plot_result(self,train_loss,test_loss,train_acc,test_acc):
-        x1 = range(0, 200)
-        x2 = range(0, 200)
-        x3 = range(0, 200)
-        x4 = range(0, 200)
+        x1 = range(0, 40)
+        x2 = range(0, 40)
+        x3 = range(0, 40)
+        x4 = range(0, 40)
         y1 = train_loss
         y2 = test_loss
         y3 = train_acc
         y4 = test_acc
 
         plt.subplot(2, 2, 1)
-        plt.plot(x1, y1, 'o-')
+        plt.plot(x1, y1, '.-')
         plt.title('Train Loss for epochs')
         plt.ylabel('Train Loss')
 
@@ -160,7 +177,7 @@ class Solver(object):
         plt.ylabel('Test loss')
 
         plt.subplot(2, 2, 3)
-        plt.plot(x3, y3, 'o-')
+        plt.plot(x3, y3, '.-')
         plt.xlabel('Train Acc for epochs')
         plt.ylabel('Train Acc(%)')
 
@@ -176,18 +193,23 @@ class Solver(object):
         self.load_data()
         self.load_model()
         accuracy = 0
+        num = 1
         for epoch in range(1, self.epochs + 1):#遍历200次，取左不取右
             self.scheduler.step(epoch)
-            print("\n===> epoch: %d/200" % epoch)
+            print("\n===> epoch: %d/40" % epoch)
             train_result = self.train()
             print(train_result)
             test_result = self.test()
             print(test_result)
+            # writer.add_scalar('Scalar/train_accuracy', train_result, num)
+            # writer.add_scalar('Scalar/test_accuracy', test_result, num)
+
             train_Loss_list.append(train_result[0])
             test_Loss_list.append(test_result[0])
             train_acc_list.append(train_result[1]*100)
             test_acc_list.append(test_result[1]*100)
             accuracy = max(accuracy, test_result[1]) #更新准确率
+            num += 1
             if epoch == self.epochs:
                 print("===> BEST ACC. PERFORMANCE: %.3f%%" % (accuracy * 100))
                 self.save()
